@@ -9,19 +9,19 @@ const img = (seed: string) => `https://picsum.photos/seed/${seed}/600/600`
 const avatar = (n: number) => `https://i.pravatar.cc/200?img=${n}`
 
 export const users: User[] = [
-  { id: 'u_lina', username: 'lina.sips', displayName: 'Lina Haddad', photoUrl: avatar(47), bio: 'Flat whites, long walks, longer layovers.', city: 'Berlin', country: 'DE', visibility: 'public', createdAt: '2025-11-02T10:00:00Z' },
-  { id: 'u_omar', username: 'omar', displayName: 'Omar Farouk', photoUrl: avatar(12), bio: 'Always in transit. Always caffeinated.', city: 'Dubai', country: 'AE', visibility: 'public', createdAt: '2025-10-14T08:00:00Z' },
-  { id: 'u_sofia', username: 'sofia.nata', displayName: 'Sofia Marques', photoUrl: avatar(45), bio: 'Pastel de nata completionist.', city: 'Lisbon', country: 'PT', visibility: 'public', createdAt: '2026-01-20T12:00:00Z' },
-  { id: 'u_mei', username: 'meiko', displayName: 'Mei Tanaka', photoUrl: avatar(44), city: 'Tokyo', country: 'JP', visibility: 'private', createdAt: '2026-02-03T09:00:00Z' },
-  { id: 'u_jonas', username: 'jonas_k', displayName: 'Jonas Krüger', photoUrl: avatar(15), bio: 'Filter coffee only.', city: 'Berlin', country: 'DE', visibility: 'private', createdAt: '2026-03-11T15:00:00Z' },
-  { id: 'u_amara', username: 'amara', displayName: 'Amara Okafor', photoUrl: avatar(32), bio: 'Weekend café crawls in London.', city: 'London', country: 'GB', visibility: 'public', createdAt: '2026-04-01T11:00:00Z' },
+  { id: 'u_lina', username: 'lina.sips', displayName: 'Lina Haddad', photoUrl: avatar(47), bio: 'Flat whites, long walks, longer layovers.', city: 'Berlin', country: 'DE', createdAt: '2025-11-02T10:00:00Z' },
+  { id: 'u_omar', username: 'omar', displayName: 'Omar Farouk', photoUrl: avatar(12), bio: 'Always in transit. Always caffeinated.', city: 'Dubai', country: 'AE', createdAt: '2025-10-14T08:00:00Z' },
+  { id: 'u_sofia', username: 'sofia.nata', displayName: 'Sofia Marques', photoUrl: avatar(45), bio: 'Pastel de nata completionist.', city: 'Lisbon', country: 'PT', createdAt: '2026-01-20T12:00:00Z' },
+  { id: 'u_mei', username: 'meiko', displayName: 'Mei Tanaka', photoUrl: avatar(44), city: 'Tokyo', country: 'JP', createdAt: '2026-02-03T09:00:00Z' },
+  { id: 'u_jonas', username: 'jonas_k', displayName: 'Jonas Krüger', photoUrl: avatar(15), bio: 'Filter coffee only.', city: 'Berlin', country: 'DE', createdAt: '2026-03-11T15:00:00Z' },
+  { id: 'u_amara', username: 'amara', displayName: 'Amara Okafor', photoUrl: avatar(32), bio: 'Weekend café crawls in London.', city: 'London', country: 'GB', createdAt: '2026-04-01T11:00:00Z' },
 ]
 
 export const follows: Follow[] = [
   ['u_lina', 'u_omar'], ['u_omar', 'u_lina'], // mutual
   ['u_lina', 'u_amara'], ['u_amara', 'u_lina'], // mutual
   ['u_lina', 'u_sofia'], // one-way
-  ['u_mei', 'u_lina'], // mei follows lina; lina can't see mei's private activity
+  ['u_mei', 'u_lina'],
   ['u_omar', 'u_sofia'], ['u_sofia', 'u_omar'],
   ['u_jonas', 'u_omar'], ['u_omar', 'u_jonas'],
 ].map(([followerId, followeeId]) => ({ followerId, followeeId, status: 'active' as Follow['status'], createdAt: '2026-05-01T00:00:00Z' }))
@@ -112,7 +112,6 @@ export const visits: Visit[] = [
   visit('u_sofia', 'c_trast', '2026-08-20T16:00:00Z', 'Came for espresso, stayed for the tiramisù.', [['tiramisu'], ['espresso']], { recommends: true, staffShoutout: { name: 'Gianni', role: 'Host', message: 'Made a table of strangers feel like family.' } }),
   visit('u_amara', 'c_kiez', '2026-09-05T10:00:00Z', 'Finally tried Lina’s spot. That cardamom bun!', [['cardamom_bun'], ['spanish_latte']], { rating: 5, recommends: true, staffShoutout: { name: 'Marta', role: 'Barista', message: 'Talked me through every bean on the shelf.' } }),
   visit('u_omar', 'c_kiez', '2026-09-19T15:00:00Z', 'Scouting for our plan. Approved.', [['cold_brew']], { recommends: true }),
-  // Private profile: hidden from viewers who aren't approved followers (e.g. Lina, whose request is pending)
   visit('u_jonas', 'c_kiez', '2026-09-15T08:00:00Z', 'Filter was fine. Cold brew better.', [['cold_brew']]),
   visit('u_mei', 'c_yanaka', '2026-09-01T14:00:00Z', 'My quiet place.', [['hand_drip']]),
   visit('u_amara', 'c_shore', '2026-09-12T21:00:00Z', 'Late-night tiramisu run.', [['tiramisu'], ['oat_cortado']], { rating: 4 }),

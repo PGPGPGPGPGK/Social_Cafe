@@ -8,8 +8,6 @@ export type ISODate = string
 
 // ---------- Users & social graph ----------
 
-export type ProfileVisibility = 'public' | 'private'
-
 /** Public-safe profile. Email/phone must NEVER live on this object (see SECURITY_REQUIREMENTS.md). */
 export interface User {
   id: ID
@@ -19,7 +17,6 @@ export interface User {
   bio?: string
   city?: string
   country?: string // ISO 3166 alpha-2
-  visibility: ProfileVisibility
   createdAt: ISODate
 }
 
@@ -232,7 +229,7 @@ export interface BadgeAward {
   userIds: ID[]
   status: 'pending_confirmation' | 'pending_review' | 'confirmed'
   confirmations: { userId: ID; at: ISODate }[]
-  proofPhotoUrls: string[] // visible only between mutual followers
+  proofPhotoUrls: string[] // early beta: never shown in the UI (SR-3 DEFERRED)
   cafeId?: ID
   note?: string
   awardedAt?: ISODate

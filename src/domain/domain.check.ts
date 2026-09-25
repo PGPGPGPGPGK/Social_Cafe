@@ -54,3 +54,10 @@ const social = computeStats([
 ], new Map([['A', cafeA]]))
 if (social.visitsWithCompanions !== 2) throw new Error(`companion counting wrong: ${social.visitsWithCompanions}`)
 console.log('companion check ok')
+
+// Social sentence joining
+import { listText } from '../components/format.ts'
+for (const [parts, want] of [[['You'], 'You'], [['You', '@a'], 'You and @a'], [['You', '@a', '@b'], 'You, @a and @b']] as const) {
+  if (listText([...parts]) !== want) throw new Error(`listText ${JSON.stringify(parts)}: got "${listText([...parts])}"`)
+}
+console.log('listText check ok')

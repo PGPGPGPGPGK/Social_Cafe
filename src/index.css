@@ -56,15 +56,10 @@ img { display: block; }
 .profile-head { display: flex; gap: 16px; align-items: center; margin: 8px 0 12px; }
 .avatar-lg { width: 84px; height: 84px; border-radius: 50%; object-fit: cover; border: 3px solid var(--accent-soft); }
 .handle { color: var(--muted); }
-.pills { display: flex; gap: 6px; margin-top: 6px; }
-.pill { font-size: 0.72rem; padding: 2px 8px; border-radius: 999px; background: var(--line); }
-.pill-accent { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .bio { margin-bottom: 4px; }
-.counts { display: grid; grid-template-columns: repeat(3, 1fr); margin: 16px 0 0; background: var(--surface); border-radius: var(--radius); border: 1px solid var(--line); }
-.counts > div, .stat { display: flex; flex-direction: column; align-items: center; padding: 12px 4px; }
-.counts b, .stat b { font-size: 1.2rem; }
-.counts span, .stat span { font-size: 0.72rem; color: var(--muted); }
-.locked { margin-top: 16px; padding: 16px; border-radius: var(--radius); background: var(--surface); border: 1px dashed var(--line); text-align: center; }
+.stat { display: flex; flex-direction: column; align-items: center; padding: 12px 4px; }
+.stat b { font-size: 1.2rem; }
+.stat span { font-size: 0.72rem; color: var(--muted); }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
 
@@ -81,7 +76,6 @@ img { display: block; }
 .progress span { position: absolute; inset: 0; font-size: 0.65rem; display: grid; place-items: center; }
 .tag { font-size: 0.68rem; color: var(--accent); }
 .tag-soft { color: var(--muted); margin-top: auto; text-transform: capitalize; }
-.proof { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; }
 
 .hscroll { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 16px; margin: 0 -16px; padding: 0 16px 4px; }
 .cafe-card { flex: 0 0 200px; scroll-snap-align: start; background: var(--surface); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); }

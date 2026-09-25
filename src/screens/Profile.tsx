@@ -4,11 +4,7 @@ import { useApi } from '../data/useApi.ts'
 import { fmtDate } from '../components/format.ts'
 import { Companions } from '../components/Companions.tsx'
 import type { BadgeProgress } from '../domain/stats.ts'
-import type { Relationship } from '../domain/types.ts'
 
-const relLabel: Partial<Record<Relationship, string>> = {
-  mutual: 'Mutual', following: 'Following', followed_by: 'Follows you', requested: 'Requested',
-}
 const verificationLabel = {
   automatic: 'Automatic', mutual_confirmation: 'Both confirm', evidence_required: 'Photo evidence', manual_review: 'Reviewed',
 }
@@ -24,8 +20,7 @@ export default function Profile() {
   if (view === undefined) return <p className="muted pad">Loading…</p>
   if (view === null) return <p className="muted pad">No such user.</p>
 
-  const { user, stats } = view
-  const isSelf = view.relationship === 'self'
+  const { user, stats, isSelf } = view
   const earned = view.badges.filter((b) => b.earned).length
   const badges = view.badges.toSorted((a, b) => Number(b.earned) - Number(a.earned))
 
@@ -36,110 +31,90 @@ export default function Profile() {
         <div>
           <h1>{user.displayName}</h1>
           <p className="handle">@{user.username}</p>
-          <div className="pills">
-            {user.visibility === 'private' && <span className="pill">🔒 Private</span>}
-            {relLabel[view.relationship] && <span className="pill pill-accent">{relLabel[view.relationship]}</span>}
-          </div>
         </div>
       </header>
       {user.bio && <p className="bio">{user.bio}</p>}
       {(user.city || user.country) && <p className="muted">📍 {[user.city, user.country].filter(Boolean).join(', ')}</p>}
 
-      <div className="counts">
-        <div><b>{view.followerCount}</b><span>Followers</span></div>
-        <div><b>{view.followingCount}</b><span>Following</span></div>
-        <div><b>{view.mutualCount}</b><span>Mutuals</span></div>
-      </div>
-
-      {!view.canViewActivity && (
-        <div className="locked">
-          🔒 This profile is private. Café activity is visible to approved followers.
-          {view.relationship === 'requested' && <div className="muted">Your follow request is pending.</div>}
+      <section>
+        <h2>Café stats</h2>
+        <div className="stats">
+          <Stat n={stats.totalVisits} label="Visits" />
+          <Stat n={stats.uniqueCafes} label="Cafés" />
+          <Stat n={stats.uniqueCountries} label="Countries" />
+          <Stat n={stats.totalConsumptions} label="Consumptions" />
+          <Stat n={stats.uniqueItems} label="Unique items" />
+          <Stat n={stats.maxRepeatsOfOneItem} label="Top repeat" />
         </div>
-      )}
-
-      {stats && (
-        <section>
-          <h2>Café stats</h2>
-          <div className="stats">
-            <Stat n={stats.totalVisits} label="Visits" />
-            <Stat n={stats.uniqueCafes} label="Cafés" />
-            <Stat n={stats.uniqueCountries} label="Countries" />
-            <Stat n={stats.totalConsumptions} label="Consumptions" />
-            <Stat n={stats.uniqueItems} label="Unique items" />
-            <Stat n={stats.maxRepeatsOfOneItem} label="Top repeat" />
-          </div>
-        </section>
-      )}
+      </section>
 
       <section>
         <h2>Badge cabinet <span className="muted">{earned}/{view.badges.length}</span></h2>
         <div className="badges">{badges.map((b) => <Badge key={b.badge.id} p={b} />)}</div>
       </section>
 
-      {view.wantToGo && (
-        <section>
-          <h2>Want to go</h2>
-          {view.wantToGo.length === 0 && <p className="muted">Nothing saved yet.</p>}
-          <div className="hscroll">
-            {view.wantToGo.map(({ cafe, alsoWant }) => (
-              <article key={cafe.id} className="cafe-card">
-                <Link to={`/cafe/${cafe.id}`}><img src={cafe.coverPhotoUrl} alt="" /></Link>
-                <div className="cafe-card-body">
-                  <Link to={`/cafe/${cafe.id}`} className="plain"><b>{cafe.name}</b></Link>
-                  <span className="muted">{cafe.area}, {cafe.city}</span>
-                  {alsoWant.length > 0 && (
-                    <span className="overlap">
-                      {isSelf ? 'You' : `@${user.username}`} &{' '}
-                      {alsoWant.map((u) => <Link key={u.id} to={`/u/${u.username}`}>@{u.username} </Link>)}
-                      want to go
-                    </span>
-                  )}
-                  {isSelf && (
-                    <button className="link-btn" onClick={() => toggleWantToGo(user.id, cafe.id)}>
-                      Remove
-                    </button>
-                  )}
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {view.recentVisits && (
-        <section>
-          <h2>Recent visits</h2>
-          <div className="visits">
-            {view.recentVisits.map(({ visit, cafe, items, companions, hiddenCompanions }) => (
-              <article key={visit.id} className="visit">
-                <div className="visit-photo">
-                  <img src={visit.photos[0].url} alt="" />
-                  {visit.photos.length > 1 && <span className="photo-count">1/{visit.photos.length}</span>}
-                  {visit.photos[0].menuItemId && <span className="photo-caption">{items.find((it) => it.id === visit.photos[0].menuItemId)?.name}</span>}
-                </div>
-                <div className="visit-body">
-                  <div className="visit-top">
-                    <Link to={`/cafe/${cafe.id}`} className="plain"><b>{cafe.name}</b></Link>
-                    {visit.rating && <span>{'★'.repeat(visit.rating)}</span>}
-                  </div>
-                  <span className="muted small">{cafe.city} · {fmtDate(visit.visitedAt)}</span>
-                  <Companions users={companions} hidden={hiddenCompanions} />
-                  <p>{visit.text}</p>
-                  {visit.staffShoutout && <span className="small muted">🙌 Shout-out to {visit.staffShoutout.name}</span>}
-                  <div className="chips">
-                    {items.map((it, i) => (
-                      <span key={it.id} className="chip">{it.name}{visit.items[i].quantity > 1 && ` ×${visit.items[i].quantity}`}</span>
+      <section>
+        <h2>Want to go</h2>
+        {view.wantToGo.length === 0 && <p className="muted">Nothing saved yet.</p>}
+        <div className="hscroll">
+          {view.wantToGo.map(({ cafe, alsoWant }) => (
+            <article key={cafe.id} className="cafe-card">
+              <Link to={`/cafe/${cafe.id}`}><img src={cafe.coverPhotoUrl} alt="" /></Link>
+              <div className="cafe-card-body">
+                <Link to={`/cafe/${cafe.id}`} className="plain"><b>{cafe.name}</b></Link>
+                <span className="muted">{cafe.area}, {cafe.city}</span>
+                {alsoWant.length > 0 && (
+                  <span className="overlap">
+                    {isSelf ? 'You' : `@${user.username}`}
+                    {alsoWant.map((u, i) => (
+                      <span key={u.id}>{i === alsoWant.length - 1 ? ' and ' : ', '}<Link to={`/u/${u.username}`}>@{u.username}</Link></span>
                     ))}
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
+                    {' '}want to go
+                  </span>
+                )}
+                {isSelf && (
+                  <button className="link-btn" onClick={() => toggleWantToGo(user.id, cafe.id)}>
+                    Remove
+                  </button>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
 
-      {view.taggedVisits && view.taggedVisits.length > 0 && (
+      <section>
+        <h2>Recent visits</h2>
+        {view.recentVisits.length === 0 && <p className="muted">No visits yet.</p>}
+        <div className="visits">
+          {view.recentVisits.map(({ visit, cafe, items, companions }) => (
+            <article key={visit.id} className="visit">
+              <div className="visit-photo">
+                <img src={visit.photos[0].url} alt="" />
+                {visit.photos.length > 1 && <span className="photo-count">1/{visit.photos.length}</span>}
+                {visit.photos[0].menuItemId && <span className="photo-caption">{items.find((it) => it.id === visit.photos[0].menuItemId)?.name}</span>}
+              </div>
+              <div className="visit-body">
+                <div className="visit-top">
+                  <Link to={`/cafe/${cafe.id}`} className="plain"><b>{cafe.name}</b></Link>
+                  {visit.rating && <span>{'★'.repeat(visit.rating)}</span>}
+                </div>
+                <span className="muted small">{cafe.city} · {fmtDate(visit.visitedAt)}</span>
+                <Companions users={companions} />
+                <p>{visit.text}</p>
+                {visit.staffShoutout && <span className="small muted">🙌 Shout-out to {visit.staffShoutout.name}</span>}
+                <div className="chips">
+                  {items.map((it, i) => (
+                    <span key={it.id} className="chip">{it.name}{visit.items[i].quantity > 1 && ` ×${visit.items[i].quantity}`}</span>
+                  ))}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {view.taggedVisits.length > 0 && (
         <section>
           <h2>{isSelf ? 'You were there too' : `@${user.username} was there too`}</h2>
           <div className="tagged">
@@ -175,11 +150,6 @@ function Badge({ p }: { p: BadgeProgress }) {
       )}
       {award?.status === 'pending_confirmation' && <span className="tag">Awaiting confirmation</span>}
       {award?.status === 'pending_review' && <span className="tag">In review</span>}
-      {earned && award && badge.requiresProofPhoto && (
-        award.proofPhotoUrls.length
-          ? <img className="proof" src={award.proofPhotoUrls[0]} alt="Proof" />
-          : <span className="tag">🔒 Proof: mutuals only</span>
-      )}
       <span className="tag tag-soft">{verificationLabel[badge.verification]} · {badge.rarity}</span>
     </div>
   )

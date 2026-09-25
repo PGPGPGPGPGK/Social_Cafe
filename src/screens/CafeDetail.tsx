@@ -86,7 +86,7 @@ export default function CafeDetail() {
           </div>
         )}
 
-        {view.followedVisitors.length > 0 && <><h3>People you follow who’ve been here</h3><Avatars users={view.followedVisitors} /></>}
+        {view.visitors.length > 0 && <><h3>People who’ve been here</h3><Avatars users={view.visitors} /></>}
         {view.wantToGoUsers.length > 0 && <><h3>Want to go</h3><Avatars users={view.wantToGoUsers} /></>}
 
         {view.triedItems.length > 0 && (
@@ -129,13 +129,13 @@ export default function CafeDetail() {
         <h3>Visits</h3>
         {view.visits.length === 0 && <p className="muted">No visits yet. <Link to="/add">Be the first.</Link></p>}
         <div className="visits">
-          {view.visits.map(({ visit, author: user, items, companions, hiddenCompanions }) => (
+          {view.visits.map(({ visit, author: user, items, companions }) => (
             <article key={visit.id} className="visit">
               <div className="visit-photo"><img src={visit.photos[0].url} alt="" /></div>
               <div className="visit-body">
                 <Link to={`/u/${user.username}`} className="visit-author"><img src={user.photoUrl} alt="" />@{user.username}</Link>
                 <span className="muted small">{fmtDate(visit.visitedAt)}</span>
-                <Companions users={companions} hidden={hiddenCompanions} />
+                <Companions users={companions} />
                 <p>{visit.text}</p>
                 <div className="chips">{items.map((it, i) => <span key={it.id} className="chip">{it.name}{visit.items[i].quantity > 1 && ` ×${visit.items[i].quantity}`}</span>)}</div>
               </div>

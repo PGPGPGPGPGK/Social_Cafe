@@ -2,14 +2,13 @@
 // view-shaped objects, so this file can be swapped for Firestore/API calls
 // without touching components.
 //
-// It also plays "server": privacy filtering happens HERE (fields the viewer may
-// not see are omitted), so the UI is already written against filtered payloads.
-// In the prototype this is not security — see SECURITY_REQUIREMENTS.md.
+// Early beta: every profile and all social activity is public to every user, so
+// there is no privacy filtering here. When private profiles return (growth phase,
+// see SECURITY_REQUIREMENTS.md), filtering belongs in this layer, not in screens.
 import * as seed from './seed.ts'
 import { computeStats, evaluateBadges, type BadgeProgress, type CafeStats } from '../domain/stats.ts'
-import { canViewActivity, canViewProofPhotos, relationship } from '../domain/visibility.ts'
 import { localToday, validateVisit, type VisitDraft } from '../domain/visits.ts'
-import type { Cafe, CafeHighlight, HighlightType, ID, MenuItem, Relationship, StaffShoutout, User, Visit, WantToGo } from '../domain/types.ts'
+import type { Cafe, CafeHighlight, HighlightType, ID, MenuItem, StaffShoutout, User, Visit, WantToGo } from '../domain/types.ts'
 
 // ---------- localStorage helpers (per-browser prototype persistence) ----------
 
@@ -55,15 +54,6 @@ const cafesById = new Map(seed.cafes.map((c) => [c.id, c]))
 const usersById = new Map(seed.users.map((u) => [u.id, u]))
 const allVisits = () => [...seed.visits, ...createdVisits]
 const itemsById = () => new Map([...seed.menuItems, ...customItems].map((i) => [i.id, i]))
-const activeFollowees = (id: ID) => seed.follows.filter((f) => f.followerId === id && f.status === 'active').map((f) => f.followeeId)
-
-// Community aggregates (café pages, Discover) only ever see activity the viewer may see (SR-29, SR-76).
-const canSee = (viewerId: ID, userId: ID) => {
-  const u = usersById.get(userId)
-  return !!u && canViewActivity(u, relationship(seed.follows, viewerId, userId))
-}
-const visibleVisits = (viewerId: ID) => allVisits().filter((v) => canSee(viewerId, v.userId))
-const visibleWantToGo = (viewerId: ID) => wantToGo.filter((w) => canSee(viewerId, w.userId))
 
 export async function listUsers(): Promise<User[]> {
   return seed.users
@@ -73,7 +63,7 @@ export async function listUsers(): Promise<User[]> {
 
 export interface WantToGoEntry {
   cafe: Cafe
-  alsoWant: User[] // people the viewer follows who also want to go — plan seed
+  alsoWant: User[] // everyone else who wants to go (excluding the viewer) — plan seed
 }
 
 export interface VisitCard {
@@ -81,17 +71,14 @@ export interface VisitCard {
   cafe: Cafe
   items: MenuItem[]
   author: User
-  companions: User[] // only companions the viewer may see
-  hiddenCompanions: number // private companions shown as "+N other"
+  companions: User[]
 }
 
-// Companions are visible to the author, to themselves, and per SR-1 otherwise (SR-82).
-function visitCard(viewerId: ID, visit: Visit, items: Map<string, MenuItem>): VisitCard {
-  const tagged = visit.companionUserIds.map((id) => usersById.get(id)).filter((u) => u !== undefined)
-  const companions = tagged.filter((u) => viewerId === visit.userId || viewerId === u.id || canSee(viewerId, u.id))
+function visitCard(visit: Visit, items: Map<string, MenuItem>): VisitCard {
   return {
     visit, cafe: cafesById.get(visit.cafeId)!, items: visit.items.map((i) => items.get(i.menuItemId)!),
-    author: usersById.get(visit.userId)!, companions, hiddenCompanions: tagged.length - companions.length,
+    author: usersById.get(visit.userId)!,
+    companions: visit.companionUserIds.map((id) => usersById.get(id)).filter((u) => u !== undefined),
   }
 }
 
@@ -99,17 +86,11 @@ const byVisitDate = (a: Visit, b: Visit) => (b.visitedAt ?? b.createdAt).localeC
 
 export interface ProfileView {
   user: User
-  relationship: Relationship
-  followerCount: number
-  followingCount: number
-  mutualCount: number
-  canViewActivity: boolean
-  // Omitted (undefined) when the viewer may not see detailed activity:
-  stats?: CafeStats
-  wantToGo?: WantToGoEntry[]
-  recentVisits?: VisitCard[]
-  taggedVisits?: VisitCard[] // other people's visits this user was tagged in
-  // Badges are always visible; progress numbers and proof photos are filtered.
+  isSelf: boolean
+  stats: CafeStats
+  wantToGo: WantToGoEntry[]
+  recentVisits: VisitCard[]
+  taggedVisits: VisitCard[] // other people's visits this user was tagged in
   badges: BadgeProgress[]
 }
 
@@ -117,47 +98,26 @@ export async function getProfileView(viewerId: ID, username: string): Promise<Pr
   const user = seed.users.find((u) => u.username === username)
   if (!user) return null
 
-  const rel = relationship(seed.follows, viewerId, user.id)
-  const allowed = canViewActivity(user, rel)
-  const followers = seed.follows.filter((f) => f.followeeId === user.id && f.status === 'active').map((f) => f.followerId)
-  const following = activeFollowees(user.id)
-
   const items = itemsById()
   const visits = allVisits().filter((v) => v.userId === user.id)
   const stats = computeStats(visits, cafesById)
   const awards = seed.badgeAwards.filter((a) => a.userIds.includes(user.id))
-  const proofOk = canViewProofPhotos(rel)
 
-  const badges = evaluateBadges(seed.badgeDefinitions, stats, visits, items, awards).map((b) => ({
-    ...b,
-    current: allowed ? b.current : undefined,
-    award: b.award && (proofOk ? b.award : { ...b.award, proofPhotoUrls: [] }),
-  }))
-
-  const base: ProfileView = {
-    user, relationship: rel, canViewActivity: allowed, badges,
-    followerCount: followers.length,
-    followingCount: following.length,
-    mutualCount: following.filter((id) => followers.includes(id)).length,
-  }
-  if (!allowed) return base
-
-  const viewerFollows = activeFollowees(viewerId)
   return {
-    ...base,
-    stats,
+    user, isSelf: user.id === viewerId, stats,
+    badges: evaluateBadges(seed.badgeDefinitions, stats, visits, items, awards),
     wantToGo: wantToGo
       .filter((w) => w.userId === user.id)
       .map((w) => ({
         cafe: cafesById.get(w.cafeId)!,
         alsoWant: wantToGo
-          .filter((o) => o.cafeId === w.cafeId && o.userId !== user.id && o.userId !== viewerId && viewerFollows.includes(o.userId))
+          .filter((o) => o.cafeId === w.cafeId && o.userId !== user.id && o.userId !== viewerId)
           .map((o) => usersById.get(o.userId)!),
       })),
-    recentVisits: visits.toSorted(byVisitDate).slice(0, 6).map((v) => visitCard(viewerId, v, items)),
+    recentVisits: visits.toSorted(byVisitDate).slice(0, 6).map((v) => visitCard(v, items)),
     taggedVisits: allVisits()
-      .filter((v) => v.userId !== user.id && v.companionUserIds.includes(user.id) && canSee(viewerId, v.userId))
-      .toSorted(byVisitDate).slice(0, 6).map((v) => visitCard(viewerId, v, items)),
+      .filter((v) => v.userId !== user.id && v.companionUserIds.includes(user.id))
+      .toSorted(byVisitDate).slice(0, 6).map((v) => visitCard(v, items)),
   }
 }
 
@@ -222,10 +182,10 @@ export interface CafeSummary {
   viewerWantsToGo: boolean
   notableItems: string[] // most consumed by the community, topped up from the menu
   visitCount: number
-  followedVisitors: User[] // people the viewer follows who visited
-  followedWantToGo: User[] // people the viewer follows who also want to go
+  visitors: User[] // everyone else who has visited
+  othersWantToGo: User[] // everyone else who wants to go
   wantToGoCount: number
-  recommendation?: { user: User; itemName?: string } // prefers people the viewer follows
+  recommendation?: { user: User; itemName?: string }
 }
 
 export interface CafeView extends CafeSummary {
@@ -239,7 +199,6 @@ export interface CafeView extends CafeSummary {
 }
 
 function summarize(viewerId: ID, cafe: Cafe, visits: Visit[], wtg: WantToGo[], items: Map<string, MenuItem>): CafeSummary {
-  const follows = new Set(activeFollowees(viewerId))
   const perItem = new Map<string, number>()
   for (const v of visits) for (const i of v.items) perItem.set(i.menuItemId, (perItem.get(i.menuItemId) ?? 0) + i.quantity)
   const popular = [...perItem].sort((a, b) => b[1] - a[1]).map(([id]) => id)
@@ -247,17 +206,17 @@ function summarize(viewerId: ID, cafe: Cafe, visits: Visit[], wtg: WantToGo[], i
   const notable = [...new Set([...popular, ...menu])].slice(0, 3).map((id) => items.get(id)?.name ?? '')
 
   const recs = visits.filter((v) => v.recommends && v.userId !== viewerId)
-  const rec = recs.find((v) => follows.has(v.userId)) ?? recs[0]
+  const rec = recs[0]
   const recItem = rec && (rec.photos.find((p) => p.menuItemId)?.menuItemId ?? rec.items[0]?.menuItemId)
 
-  const others = (ids: ID[]) => [...new Set(ids)].filter((id) => id !== viewerId && follows.has(id)).map((id) => usersById.get(id)!)
+  const others = (ids: ID[]) => [...new Set(ids)].filter((id) => id !== viewerId).map((id) => usersById.get(id)!)
   return {
     cafe,
     viewerWantsToGo: wantToGo.some((w) => w.userId === viewerId && w.cafeId === cafe.id),
     notableItems: notable.filter(Boolean),
     visitCount: visits.length,
-    followedVisitors: others(visits.map((v) => v.userId)),
-    followedWantToGo: others(wtg.map((w) => w.userId)),
+    visitors: others(visits.map((v) => v.userId)),
+    othersWantToGo: others(wtg.map((w) => w.userId)),
     wantToGoCount: wtg.length,
     recommendation: rec && { user: usersById.get(rec.userId)!, itemName: recItem && items.get(recItem)?.name },
   }
@@ -265,10 +224,10 @@ function summarize(viewerId: ID, cafe: Cafe, visits: Visit[], wtg: WantToGo[], i
 
 export async function listDiscover(viewerId: ID, query = ''): Promise<CafeSummary[]> {
   const q = query.trim().toLowerCase()
-  const visits = visibleVisits(viewerId)
-  const wtg = visibleWantToGo(viewerId)
+  const visits = allVisits()
+  const wtg = wantToGo
   const items = itemsById()
-  const socialScore = (s: CafeSummary) => s.followedVisitors.length + s.followedWantToGo.length + (s.recommendation ? 1 : 0)
+  const socialScore = (s: CafeSummary) => s.visitors.length + s.othersWantToGo.length + (s.recommendation ? 1 : 0)
   return seed.cafes
     .filter((c) => !q || `${c.name} ${c.area} ${c.city} ${c.country} ${c.tags.join(' ')}`.toLowerCase().includes(q))
     .map((c) => summarize(viewerId, c, visits.filter((v) => v.cafeId === c.id), wtg.filter((w) => w.cafeId === c.id), items))
@@ -279,8 +238,8 @@ export async function getCafeView(viewerId: ID, cafeId: ID): Promise<CafeView | 
   const cafe = cafesById.get(cafeId)
   if (!cafe) return null
   const items = itemsById()
-  const visits = visibleVisits(viewerId).filter((v) => v.cafeId === cafeId).toSorted(byVisitDate)
-  const wtg = visibleWantToGo(viewerId).filter((w) => w.cafeId === cafeId)
+  const visits = allVisits().filter((v) => v.cafeId === cafeId).toSorted(byVisitDate)
+  const wtg = wantToGo.filter((w) => w.cafeId === cafeId)
   const user = (id: ID) => usersById.get(id)!
 
   const tried = new Map<string, { consumptions: number; people: Set<ID> }>()
@@ -301,7 +260,7 @@ export async function getCafeView(viewerId: ID, cafeId: ID): Promise<CafeView | 
     ...summarize(viewerId, cafe, visits, wtg, items),
     highlights,
     photos: visits.flatMap((v) => v.photos.map((p) => ({ url: p.url, user: user(v.userId), itemName: p.menuItemId && items.get(p.menuItemId)?.name }))),
-    visits: visits.map((v) => visitCard(viewerId, v, items)),
+    visits: visits.map((v) => visitCard(v, items)),
     triedItems: [...tried].map(([id, t]) => ({ item: items.get(id)!, consumptions: t.consumptions, people: t.people.size }))
       .sort((a, b) => b.people - a.people || b.consumptions - a.consumptions),
     recommendations: visits.filter((v) => v.recommends)
